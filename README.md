@@ -23,4 +23,4 @@ Dopo ogni modifica al codice, clicca sull'icona di ricarica dell'estensione e ag
 
 ## Modello
 
-Il modello è impostato in `background.js` (`DEFAULT_MODEL`, predefinito `gemma4:12b`). Cambialo con uno dei modelli installati (`ollama list`).
+Scegli il modello dal menu a tendina nel popup: l'elenco viene letto da Ollama (`ollama list`, esclusi i modelli di embedding) e la scelta viene ricordata. `DEFAULT_MODEL` in `background.js` (predefinito `gemma4:12b`) è usato solo se non hai ancora scelto nulla.

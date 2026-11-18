@@ -103,6 +103,33 @@ function initUI() {
     }
     input[type="text"]:focus { border-color: #6366f1; }
 
+    select {
+      width: 100%;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      padding: 6px 8px;
+      color: #fff;
+      font-size: 12px;
+      color-scheme: dark;
+      outline: none;
+    }
+    select:focus { border-color: #6366f1; }
+    option { background: #27272a; color: #fff; }
+
+    /* Lista opzioni stilabile (Chromium recente): evita l'hover con i colori di sistema/tema */
+    select, ::picker(select) { appearance: base-select; }
+    ::picker(select) {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      color: #fff;
+      padding: 4px;
+    }
+    select option { padding: 6px 8px; border-radius: 6px; }
+    select option:hover, select option:focus-visible { background: #3f3f46; color: #fff; }
+    select option:checked { background: #6366f1; color: #fff; }
+
     .btn-send {
       background: #27272a;
       border: 1px solid #3f3f46;
@@ -169,6 +196,8 @@ function initUI() {
 
       <button class="btn-primary" id="btn-rephrase">✨ Riformula (stesso senso)</button>
 
+      <select id="model-select" title="Modello Ollama"><option value="">Modello predefinito</option></select>
+
       <div class="prompt-row">
         <input type="text" id="custom-prompt" placeholder="Es: rendi più amichevole..." />
         <button class="btn-send" id="btn-custom">Vai</button>
@@ -203,6 +232,23 @@ function bindEvents() {
   const actionsRow = shadowRoot.getElementById("actions-row");
   const btnCopy = shadowRoot.getElementById("btn-copy");
 
+  // Selettore modello: elenco da Ollama, scelta salvata in chrome.storage
+  const modelSelect = shadowRoot.getElementById("model-select");
+  const loadModels = async () => {
+    try {
+      const [res, saved] = await Promise.all([
+        chrome.runtime.sendMessage({ action: "listModels" }),
+        chrome.storage.local.get("model")
+      ]);
+      if (!res?.models?.length) return;
+      modelSelect.replaceChildren(...res.models.map((m) => new Option(m, m)));
+      modelSelect.value = [saved.model, res.default].find((m) => res.models.includes(m)) ?? res.models[0];
+    } catch {}
+  };
+  modelSelect.addEventListener("change", () => {
+    chrome.storage.local.set({ model: modelSelect.value }).catch(() => {});
+  });
+
   // Clic sull'iconcina -> apre il popup
   floatingBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -221,6 +267,7 @@ function bindEvents() {
     actionsRow.style.display = "none";
     customInput.value = "";
     customInput.focus();
+    loadModels();
   });
 
   const btnCancel = shadowRoot.getElementById("btn-cancel");
@@ -306,7 +353,7 @@ function bindEvents() {
         finish();
       }
     });
-    port.postMessage({ text: selectedText, mode, customPrompt: promptVal });
+    port.postMessage({ text: selectedText, mode, customPrompt: promptVal, model: modelSelect.value });
   };
 
   // Trascina il popup dall'header
