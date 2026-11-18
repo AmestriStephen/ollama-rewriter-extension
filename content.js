@@ -7,7 +7,7 @@ let cancelRun = null; // annulla la richiesta in corso
 let userPos = null; // posizione scelta trascinando il popup (riusata alle aperture successive)
 
 function initUI() {
-  if (hostElement) return;
+  if (hostElement?.isConnected) return; // le SPA possono rimuovere il nodo dal DOM
   hostElement = document.createElement("div");
   hostElement.id = "ollama-rewriter-host";
   document.body.appendChild(hostElement);
@@ -363,13 +363,26 @@ function bindEvents() {
     setTimeout(() => { btnCopy.textContent = "Copia testo"; }, 1500);
   });
 
+  // I tasti digitati nel popup non devono arrivare alla pagina: nello shadow DOM l'evento viene
+  // ritargettato sull'host, quindi il sito non lo riconosce come campo di testo e scatta
+  // le sue scorciatoie (es. "f" = schermo intero, "c" = sottotitoli su YouTube).
+  for (const type of ["keydown", "keyup", "keypress"]) {
+    popupCard.addEventListener(type, (e) => {
+      e.stopPropagation();
+      if (type === "keydown" && e.key === "Escape") {
+        cancelRun?.();
+        popupCard.style.display = "none";
+      }
+    });
+  }
+
   // Evita che clic dentro il popup chiudano tutto
   popupCard.addEventListener("mousedown", (e) => e.stopPropagation());
   floatingBtn.addEventListener("mousedown", (e) => e.stopPropagation());
 }
 
 // Rileva selezione del testo
-document.addEventListener("mouseup", () => {
+function onSelectionEnd() {
   if (!document.body) return;
   initUI();
   const floatingBtn = shadowRoot.getElementById("floating-btn");
@@ -405,12 +418,21 @@ document.addEventListener("mouseup", () => {
     floatingBtn.style.left = `${Math.min(window.innerWidth - 40, rect.right)}px`;
     floatingBtn.style.display = "flex";
   }, 10);
-});
+}
+// Capture: molti siti/editor fermano la propagazione di mouseup e il bottone non appariva
+document.addEventListener("mouseup", onSelectionEnd, true);
+// Selezione da tastiera (Shift+frecce, Ctrl+A)
+document.addEventListener("keyup", (e) => {
+  if (e.key === "Shift" || e.shiftKey || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a")) onSelectionEnd();
+}, true);
 
-// Chiudi icona e popup se si clicca altrove nella pagina
+// Cliccare altrove nasconde solo l'icona; il popup resta aperto (si chiude con × o Esc)
 document.addEventListener("mousedown", () => {
   if (!shadowRoot) return;
-  cancelRun?.();
   shadowRoot.getElementById("floating-btn").style.display = "none";
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !shadowRoot) return;
+  cancelRun?.();
   shadowRoot.getElementById("popup-card").style.display = "none";
 });
