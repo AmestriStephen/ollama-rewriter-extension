@@ -40,6 +40,10 @@ function initUI() {
       position: fixed;
       z-index: 2147483647;
       width: 320px;
+      min-width: 280px;
+      max-width: calc(100vw - 20px);
+      min-height: 160px;
+      resize: both;
       background: #18181b;
       color: #f4f4f5;
       border: 1px solid #3f3f46;
@@ -148,12 +152,15 @@ function initUI() {
       border-radius: 8px;
       padding: 10px;
       line-height: 1.45;
-      max-height: 180px;
+      flex: 1 1 auto;
+      min-height: 60px;
+      max-height: 180px; /* rimosso quando l'utente ridimensiona il popup */
       overflow-y: auto;
       overscroll-behavior: contain;
       white-space: pre-wrap;
     }
 
+    .header, .btn-primary, select, .prompt-row, .loader, .actions-row { flex-shrink: 0; }
     .actions-row {
       display: none;
       justify-content: flex-end;
@@ -277,7 +284,14 @@ function bindEvents() {
   const clampPopup = () => {
     const maxTop = window.innerHeight - popupCard.offsetHeight - 10;
     popupCard.style.top = `${Math.max(10, Math.min(parseFloat(popupCard.style.top), maxTop))}px`;
+    const maxLeft = window.innerWidth - popupCard.offsetWidth - 10;
+    popupCard.style.left = `${Math.max(10, Math.min(parseFloat(popupCard.style.left), maxLeft))}px`;
   };
+
+  // Ridimensionamento manuale (resize del browser imposta height inline): il risultato usa tutto lo spazio
+  new ResizeObserver(() => {
+    resultBox.style.maxHeight = popupCard.style.height ? "none" : "";
+  }).observe(popupCard);
 
   closeBtn.addEventListener("click", () => {
     cancelRun?.();
@@ -296,7 +310,18 @@ function bindEvents() {
     btnRephrase.disabled = true;
     btnCustom.disabled = true;
 
+    const status = loader.querySelector("span");
+    const t0 = Date.now();
+    let generating = false;
+    const setStatus = () => {
+      const s = Math.round((Date.now() - t0) / 1000);
+      status.textContent = generating ? "Generazione in corso..." : `Attesa del modello... ${s}s`;
+    };
+    setStatus();
+    const tick = setInterval(setStatus, 1000);
+
     const reset = () => {
+      clearInterval(tick);
       loader.style.display = "none";
       btnRephrase.disabled = false;
       btnCustom.disabled = false;
@@ -333,6 +358,8 @@ function bindEvents() {
 
     port.onMessage.addListener((msg) => {
       if (msg.chunk) {
+        generating = true;
+        setStatus();
         out += msg.chunk;
         // autoscroll solo se l'utente è già in fondo, altrimenti non togliergli il controllo
         const atBottom = resultBox.scrollHeight - resultBox.scrollTop - resultBox.clientHeight < 24;

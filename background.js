@@ -3,11 +3,15 @@ const TAGS_URL = "http://localhost:11434/api/tags";
 const DEFAULT_MODEL = "gemma4:12b"; // modello usato se non ne scegli uno dal popup
 const IDLE_TIMEOUT_MS = 90000; // nessun byte ricevuto per tanto tempo -> errore
 
+// Evita che il modello "converta" simboli in LaTeX/Markdown (es. ħ -> $\hbar$)
+const KEEP =
+  " Conserva ESATTAMENTE simboli, lettere greche, formule, numeri, unità, URL, codice e caratteri speciali (es. ħ, ∑, →, €): non convertirli in LaTeX, Markdown o altre notazioni e non aggiungere delimitatori come $ o `. Rispondi in testo semplice.";
+
 function buildPrompt({ text, mode, customPrompt }) {
   const instruction =
     mode === "rephrase"
-      ? "Riformula il seguente testo (parola o frase) cambiandone la forma ma mantenendo esattamente lo stesso senso e la stessa lingua. Restituisci SOLO il testo riformulato, senza virgolette, introduzioni o commenti."
-      : `Applica questa istruzione al testo fornito: "${customPrompt}". Mantieni la lingua originale del testo. Restituisci SOLO il testo modificato, senza virgolette, introduzioni o commenti.`;
+      ? "Riformula il seguente testo (parola o frase) cambiandone la forma ma mantenendo esattamente lo stesso senso e la stessa lingua. Restituisci SOLO il testo riformulato, senza virgolette, introduzioni o commenti." + KEEP
+      : `Applica questa istruzione al testo fornito: "${customPrompt}". Mantieni la lingua originale del testo. Restituisci SOLO il testo modificato, senza virgolette, introduzioni o commenti.` + KEEP;
   return `${instruction}\n\nTesto originale:\n${text}`;
 }
 
@@ -58,6 +62,7 @@ chrome.runtime.onConnect.addListener((port) => {
           model,
           prompt: buildPrompt(request),
           stream: true,
+          keep_alive: "30m", // tiene il modello in memoria: evita lunghi ricaricamenti (sembrava "bloccato")
           think: false, // niente ragionamento nascosto: riscrivere non ne ha bisogno
           options: { temperature: 0.35, num_predict: 1024 }
         })
